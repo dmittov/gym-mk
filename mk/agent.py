@@ -1,11 +1,13 @@
 import numpy as np
-from abc import ABC
+from abc import ABC, abstractmethod
 
 
 class Agent(ABC):
+    @abstractmethod
     def act(self, state: np.ndarray) -> np.ndarray:
         pass
 
+    @abstractmethod
     def load_model(self, model: str):
         pass
 

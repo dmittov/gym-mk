@@ -3,7 +3,7 @@ import retro
 from typing import Optional
 from mk.wrappers import apply_warppers
 from mk.agent import RandomAgent
-from mk.reward import compute_reward, Info
+from mk.reward import TrueReward, Info
 import logging
 import numpy as np
 
@@ -32,7 +32,7 @@ def play(model: Optional[str], games: int) -> None:
             state = next_state
             info = Info(**raw_info)
             if is_done:
-                reward = compute_reward(reward, info)
+                reward = TrueReward.compute_reward(reward, info)
                 rewards.append(reward)
     logger.info("Avg reward in %d games: %f", games, np.mean(rewards))
 
