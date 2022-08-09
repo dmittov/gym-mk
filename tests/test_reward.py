@@ -1,5 +1,3 @@
-from ast import In
-import pytest
 from mk.reward import TrueReward, Info
 import numpy as np
 

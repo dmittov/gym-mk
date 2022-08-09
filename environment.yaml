@@ -2,6 +2,9 @@ channels:
   - default
 dependencies:
   - python=3.8
-  - ffmpeg=4.3.2
+  - ffmpeg
   - black
   - pytest
+  - mkl
+  - mkl-include
+  

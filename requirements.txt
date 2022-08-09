@@ -1,3 +1,6 @@
-gym-retro==0.8.0
-torch==1.7.0
-click==8.0.3
+gym-retro
+tensorboard
+torch
+scikit-learn
+torch-tb-profiler
+matplotlib

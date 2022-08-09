@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+import numpy as np
 
 
 @dataclass
@@ -9,6 +10,15 @@ class Info:
     health: int
     matches_won: int
     wins: int
+
+
+@dataclass
+class Episode:
+    info: Info
+    reward: float
+    is_done: bool
+    state: np.ndarray
+    action: np.ndarray
 
 
 class Reward(ABC):
