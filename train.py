@@ -1,14 +1,11 @@
 import click
-import retro
 import torch
-from typing import Optional
 from mk.wrappers import apply_warppers
 from mk.agent import RandomAgent
 from mk.reward import TrueReward, Info
 import logging
 import numpy as np
 from mk.worker import Worker, make_env
-import time
 import torch.multiprocessing as mp
 from mk.model import View, HealthPredictor
 from mk.reward import Info, Episode
@@ -16,7 +13,6 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sklearn.metrics import mean_absolute_error
-import matplotlib.image
 
 
 logging.basicConfig(level=logging.INFO)
