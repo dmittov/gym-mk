@@ -41,7 +41,7 @@ class View(AView):
     def forward(self, frames):
         # B H W C --> B C H W
         x = frames.permute(0, 3, 1, 2)  # 224x320x3
-        x = self.conv1(x)  # 112x160
+        x = self.conv1(x)  # 112x160x12
         x = self.conv2(x)  # 56x80x24
         x = self.conv3(x)  # 28x40x36
         x = self.conv4(x)  # 14x20x36
