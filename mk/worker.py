@@ -11,24 +11,21 @@ from mk.agent import Agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def make_env() -> gym.Env:
     env = retro.RetroEnv(game="MortalKombat3-Genesis", players=1, record=False)
     return env
 
 
 class Worker(mp.Process):
-
-    def __init__(self, 
-                 exit_event: mp.Event, 
-                 make_env: Callable, 
-                 queue: mp.Queue,
-                 agent: Agent
-                 ) -> None:
+    def __init__(
+        self, exit_event: mp.Event, make_env: Callable, q: mp.Queue, agent: Agent
+    ) -> None:
         super().__init__()
         self.make_env = make_env
         self.exit_event = exit_event
         self.agent = agent
-        self.queue = queue
+        self.q = q
 
     def run(self) -> None:
         env = self.make_env()
@@ -49,9 +46,8 @@ class Worker(mp.Process):
                         state=state,
                         action=action,
                     )
-                    self.queue.put(episode)
+                    self.q.put(episode)
                 state = next_state
                 episode_idx += 1
                 if is_done:
                     pass
-

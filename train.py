@@ -13,17 +13,42 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sklearn.metrics import mean_absolute_error
-
+from typing import List
+from dataclasses import dataclass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class HealthLearner(mp.Process):
-    def __init__(self, exit_event: mp.Event, queue: mp.Queue) -> None:
+@dataclass
+class EpisodeBatch:
+    info: List[Info]
+    reward: np.ndarray
+    is_done: np.ndarray
+    state: np.ndarray
+    action: np.ndarray
+
+
+class HealthLearner:
+    def __init__(self, exit_event: mp.Event, q: mp.Queue, batch_size: int = 64) -> None:
         super().__init__()
-        self.queue = queue
+        self.q = q
         self.exit_event = exit_event
+        self.batch_size = batch_size
+
+    def make_batch(self) -> EpisodeBatch:
+        episodes: List[Episode] = list()
+        for _ in range(self.batch_size):
+            episodes.append(self.q.get())
+        np.random.shuffle(episodes)
+        batch = EpisodeBatch(
+            info=[ep.info for ep in episodes],
+            reward=np.array([ep.reward for ep in episodes]),
+            is_done=np.array([ep.is_done for ep in episodes]),
+            state=np.stack([ep.state for ep in episodes], axis=0),
+            action=np.stack([ep.action for ep in episodes], axis=0),
+        )
+        return batch
 
     def run(self) -> None:
         warm_up = 1000
@@ -36,13 +61,11 @@ class HealthLearner(mp.Process):
         predictor.train()
 
         for episode_idx in tqdm(range(100_000)):
-            episode: Episode = self.queue.get()
+            batch: EpisodeBatch = self.make_batch()
             optimizer.zero_grad()
-            t_input = torch.Tensor(
-                episode.state[np.newaxis, :]
-            )
+            t_input = torch.Tensor(batch.state)
             t_true_health = torch.Tensor(
-                np.array([[episode.info.health]])
+                np.array([[info.health for info in batch.info]])
             )
             t_pred_health = predictor(t_input)
             t_loss = F.mse_loss(t_pred_health, t_true_health)
@@ -59,34 +82,32 @@ class HealthLearner(mp.Process):
                 writer.add_scalar("True", y_true[0], episode_idx)
                 # matplotlib.image.imsave(f"img/img_{episode_idx}_{y_pred[0]}_{y_true[0]}.png", episode.state)
         self.exit_event.set()
-        
+
 
 @click.command()
 @click.option("--workers", default=5, help="Number of game processes", type=int)
 def play(workers: int) -> None:
     exit_producer = mp.Event()
     exit_consumer = mp.Event()
-    queue = mp.Queue(maxsize=5_000)
+    q = mp.Queue(maxsize=5_000)
     agent = RandomAgent()
     workers = [
         Worker(
-            exit_event=exit_producer, 
-            make_env=make_env, 
-            queue=queue,
+            exit_event=exit_producer,
+            make_env=make_env,
+            q=q,
             agent=agent,
-        ) 
+        )
         for _ in range(workers)
     ]
-    consumer = HealthLearner(exit_event=exit_producer, queue=queue)
+    consumer = HealthLearner(exit_event=exit_producer, q=q)
     [worker.start() for worker in workers]
     logger.info("Workers started")
-    consumer.start()
-    logger.info("Consumer started")
+    consumer.run()
     # while not exit_producer.is_set():
-    #     # print(f"Queue size: {queue.qsize()}")
+    #     # print(f"Queue size: {q.qsize()}")
     #     time.sleep(2)
     [worker.join() for worker in workers]
-    consumer.join()
     logger.info("All process closed")
 
 
