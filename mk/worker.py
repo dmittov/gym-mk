@@ -6,6 +6,7 @@ import gym
 import retro
 from mk.reward import Info, Episode
 from mk.agent import Agent
+import os
 
 
 logging.basicConfig(level=logging.INFO)
@@ -34,12 +35,14 @@ class Worker(mp.Process):
             state = env.reset()
             is_done = False
             episode_idx = 0
+            n_skip = 1
             while not is_done:
                 action = self.agent.act(state)
                 next_state, reward, is_done, raw_info = env.step(action)
-                if episode_idx % 10 == 0:
+                if episode_idx % n_skip == 0:
                     info = Info(**raw_info)
                     episode = Episode(
+                        worker=os.getpid(),
                         info=info,
                         reward=reward,
                         is_done=is_done,

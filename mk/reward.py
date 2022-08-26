@@ -14,6 +14,7 @@ class Info:
 
 @dataclass
 class Episode:
+    worker: int
     info: Info
     reward: float
     is_done: bool

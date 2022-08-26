@@ -15,6 +15,7 @@ from tqdm import tqdm
 from sklearn.metrics import mean_absolute_error
 from typing import List
 from dataclasses import dataclass
+from collections import Counter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,6 +28,8 @@ class EpisodeBatch:
     is_done: np.ndarray
     state: np.ndarray
     action: np.ndarray
+    n_workers: int
+    top_worker_ratio: float
 
 
 class HealthLearner:
@@ -40,18 +43,22 @@ class HealthLearner:
         episodes: List[Episode] = list()
         for _ in range(self.batch_size):
             episodes.append(self.q.get())
-        np.random.shuffle(episodes)
+        workers = Counter(ep.worker for ep in episodes)
         batch = EpisodeBatch(
             info=[ep.info for ep in episodes],
             reward=np.array([ep.reward for ep in episodes]),
             is_done=np.array([ep.is_done for ep in episodes]),
             state=np.stack([ep.state for ep in episodes], axis=0),
             action=np.stack([ep.action for ep in episodes], axis=0),
+            n_workers=len(workers),
+            top_worker_ratio=1.0
+            * workers.most_common(1)[0][1]
+            / sum(list(workers.values())),
         )
         return batch
 
     def run(self) -> None:
-        warm_up = 1000
+        warm_up = 10
         logger.info("Consumer started")
         predictor = HealthPredictor(View(frames=3))
         optimizer = torch.optim.Adam(predictor.parameters())
@@ -60,7 +67,7 @@ class HealthLearner:
 
         predictor.train()
 
-        for episode_idx in tqdm(range(100_000)):
+        for episode_idx in tqdm(range(200)):
             batch: EpisodeBatch = self.make_batch()
             optimizer.zero_grad()
             t_input = torch.Tensor(batch.state)
@@ -72,14 +79,18 @@ class HealthLearner:
             t_loss.backward()
             optimizer.step()
             loss = float(t_loss.cpu().detach().numpy())
-            if (episode_idx > warm_up) and (episode_idx % 100 == 0):
+            if episode_idx > warm_up:  # and (episode_idx % 100 == 0):
                 loss = float(t_loss.cpu().detach().numpy())
                 writer.add_scalar("Loss", loss, episode_idx)
-                y_pred = np.array([float(t_pred_health.cpu().detach().numpy())])
+                y_pred = np.array(t_pred_health.cpu().detach().numpy())
                 y_true = t_true_health.cpu().detach().numpy().ravel()
                 mae = mean_absolute_error(y_true, y_pred)
                 writer.add_scalar("MAE", mae, episode_idx)
                 writer.add_scalar("True", y_true[0], episode_idx)
+                writer.add_scalar("N_workers", batch.n_workers, episode_idx)
+                writer.add_scalar(
+                    "Top worker ratio", batch.top_worker_ratio, episode_idx
+                )
                 # matplotlib.image.imsave(f"img/img_{episode_idx}_{y_pred[0]}_{y_true[0]}.png", episode.state)
         self.exit_event.set()
 
