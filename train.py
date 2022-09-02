@@ -75,13 +75,16 @@ class HealthLearner:
                 np.array([[info.health for info in batch.info]])
             )
             t_pred_health = predictor(t_input)
-            t_loss = F.mse_loss(t_pred_health, t_true_health)
+            t_loss = F.mse_loss(t_pred_health, t_true_health.reshape(t_pred_health.shape))
             t_loss.backward()
             optimizer.step()
             loss = float(t_loss.cpu().detach().numpy())
             if episode_idx > warm_up:  # and (episode_idx % 100 == 0):
                 loss = float(t_loss.cpu().detach().numpy())
                 writer.add_scalar("Loss", loss, episode_idx)
+                gradients = predictor.actions.weight.grad.cpu().detach().numpy()[0]
+                gradients = sum(np.abs(gradients) ** 2)
+                writer.add_scalar("GradNorm", gradients, episode_idx)
                 y_pred = np.array(t_pred_health.cpu().detach().numpy())
                 y_true = t_true_health.cpu().detach().numpy().ravel()
                 mae = mean_absolute_error(y_true, y_pred)
